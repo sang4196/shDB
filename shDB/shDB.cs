@@ -5,68 +5,54 @@ using System.Collections;
 using System.Runtime.InteropServices;
 using System.Data.SqlClient;
 using System.Data.OleDb;
+using Oracle.ManagedDataAccess.Client;
+using System.Collections.Generic;
 
 namespace shDB
 {
     namespace MSSQL
     {
-        public class SQLS : IDisposable
+        public class CSQL : IDisposable
         {
-            private System.ComponentModel.Component m_component;
-            private string m_strConnString;
-            public static SqlConnection m_SqlCon;
-            private static SqlTransaction m_Trans;
+            readonly string m_sConnectionString;
+            static SqlTransaction m_Trans;
+            static SqlConnection m_SqlCon;
 
             #region con
             public string ConnString
             {
-                get { return m_strConnString; }
+                get { return m_sConnectionString; }
             }
 
-            public SqlConnection SqlCon
+            public SqlConnection SqlConnection
             {
                 get { return m_SqlCon; }
             }
 
-            /// <summary>
-            /// 생성자 : Web.Config에서 DB연결정보 얻기
-            /// </summary>
-            public SQLS()
-            {
-                m_component = new System.ComponentModel.Component();
-                try
-                {
-                    m_strConnString = "Server=localhost;database=DF_DB;Password=1;User ID=sa;";
-                }
-                catch (Exception ex)
-                {
-                    throw new ApplicationException(System.Reflection.MethodBase.GetCurrentMethod().Name, ex);
-                }
-                //finally
-                //{
-                //}
-            }
+            //public CSQL()
+            //{
+            //    try
+            //    {
+            //        m_sConnectionString = "Server=localhost;database=DF_DB;Password=1;User ID=sa;";
+            //    }
+            //    catch (Exception ex)
+            //    {
+            //        throw new ApplicationException(System.Reflection.MethodBase.GetCurrentMethod().Name, ex);
+            //    }
+            //}
 
-            /// <summary>
-            /// 생성자 : DB연결정보 얻기
-            /// </summary>
-            /// <param name="strConnection">연결문자</param>
-            public SQLS(string strConnection)
+            public CSQL(string _sConnection)
             {
-                m_component = new System.ComponentModel.Component();
                 try
                 {
-                    m_strConnString = strConnection;
+                    m_sConnectionString = _sConnection;
                 }
                 catch (Exception ex)
                 {
                     throw new ApplicationException(System.Reflection.MethodBase.GetCurrentMethod().Name, ex);
                 }
-                //finally
-                //{
-                //}
             }
-            ~SQLS()
+            ~CSQL()
             {
                 Dispose(false);
             }
@@ -76,14 +62,8 @@ namespace shDB
                 Dispose(true);
             }
 
-            protected virtual void Dispose(bool bolDisposing)
+            protected virtual void Dispose(bool _bDisposing)
             {
-                if (bolDisposing)
-                {
-                    if (m_component != null)
-                        m_component.Dispose();
-                }
-
                 GC.SuppressFinalize(this);
             }
             #endregion
@@ -95,21 +75,6 @@ namespace shDB
                 try
                 {
                     m_Trans = m_SqlCon.BeginTransaction();
-                }
-                catch (Exception ex)
-                {
-                    throw new ApplicationException(System.Reflection.MethodBase.GetCurrentMethod().Name, ex);
-                }
-            }
-
-            public void TransactionHandling(int ErrNum)
-            {
-                try
-                {
-                    if (ErrNum.Equals(0))
-                        m_Trans.Commit();
-                    else
-                        m_Trans.Rollback();
                 }
                 catch (Exception ex)
                 {
@@ -132,78 +97,87 @@ namespace shDB
             }
             #endregion
 
-            #region MS-SQL 서버 연결 및 해제
-            /// <summary>
-            /// MS-SQL 서버 연결.
-            /// </summary>
-            /// <returns>연결여부</returns>
-            public bool sql_Connect()
+            #region connect disconnect
+            public bool Sql_Connect()
             {
                 try
                 {
-                    //연결정보가 없는 경우
-                    if (m_strConnString == "")
-                        return false;
-                    else
+                    if (m_sConnectionString != "")
                     {
-                        m_SqlCon = new SqlConnection(m_strConnString);
-                        //Open상태가 아니면 Open한다.
+                        m_SqlCon = new SqlConnection(m_sConnectionString);
+
                         if (m_SqlCon.State != ConnectionState.Open)
                             m_SqlCon.Open();
 
-                        if (m_SqlCon.State != ConnectionState.Open)
-                            return false;
-                        else
+                        if (m_SqlCon.State == ConnectionState.Open)
                             return true;
                     }
+
+                    return false;
                 }
                 catch (Exception ex)
                 {
                     return false;
                     throw new ApplicationException(System.Reflection.MethodBase.GetCurrentMethod().Name, ex);
                 }
-                //finally
-                //{
-                //}
             }
 
-            /// <summary>
-            /// MS-SQL 서버 연결 끊기.
-            /// </summary>
-            public void sql_DisConnect()
+            public void Sql_Disconnect()
             {
                 try
                 {
-                    if (m_SqlCon == null) return;
-
-                    if (m_SqlCon.State == ConnectionState.Open)
+                    if (m_SqlCon != null)
                     {
-                        m_SqlCon.Close();
+                        if (m_SqlCon.State == ConnectionState.Open)
+                            m_SqlCon.Close();
+
                         m_SqlCon = null;
                     }
-                    else
-                        m_SqlCon = null;
                 }
                 catch (Exception ex)
                 {
                     throw new ApplicationException(System.Reflection.MethodBase.GetCurrentMethod().Name, ex);
                 }
-                //finally
-                //{
-                //}
             }
             #endregion
 
-            #region 저장프로시저 실행
+            #region Execute
 
             /// <summary>
-            /// 읽기 저장프로시저 실행 : 인자(데이터테이블)가 있는 경우
+            /// exec query
             /// </summary>
-            /// <param name="Conn">DB연결객체</param>
-            /// <param name="strSPName">SP명</param>
-            /// <param name="dtSPParameter">인자 배열</param>
-            /// <returns>Select결과</returns>
-            public DataTable executeQuery_Proc(SqlConnection Conn, string strSPName, DataTable dtSPParameter)
+            /// <param name="_Connection">Connection</param>
+            /// <param name="_sQuery">Text query</param>
+            /// <returns></returns>
+            public DataTable ExecuteQuery_Text(SqlConnection _Connection, string _sQuery)
+            {
+                DataTable dt = new DataTable();
+                try
+                {
+                    if (_Connection.State == ConnectionState.Open)
+                    {
+                        SqlCommand m_SqlCmd = new SqlCommand()
+                        {
+                            Connection = _Connection,
+                            CommandType = CommandType.Text,
+                            CommandText = _sQuery
+                        };
+
+                        SqlDataAdapter da = new SqlDataAdapter(m_SqlCmd);
+                        da.Fill(dt);
+                    }
+                    return dt;
+                }
+                catch (Exception ex)
+                {
+                    throw new ApplicationException(System.Reflection.MethodBase.GetCurrentMethod().Name, ex);
+                }
+                //finally
+                //{
+                //}
+            }
+
+            public DataTable ExecuteQuery_SP(SqlConnection Conn, string strSPName, DataTable dtSPParameter)
             {
                 DataTable dt = new DataTable();
                 try
@@ -216,22 +190,23 @@ namespace shDB
                         m_SqlCmd.CommandText = strSPName;
                         foreach (DataRow dr in dtSPParameter.Rows)
                         {
-                            SqlParameter param = new SqlParameter();
-                            param.ParameterName = dr["ParamName"].ToString();
-                            param.Direction = (ParameterDirection)dr["ParamDirect"];
-                            param.SqlDbType = (SqlDbType)dr["DBType"];
-
-                            param.Value = dr["Value"].ToString();
-                            if (dr["Length"].ToString() != "")
+                            SqlParameter param = new SqlParameter()
                             {
-                                if (Convert.ToInt32(dr["Length"].ToString()) > 0)
-                                    param.Size = Convert.ToInt32(dr["Length"].ToString());
+                                ParameterName = dr[(int)PARAM_TYPE.NAME].ToString(),
+                                Direction = (ParameterDirection)dr[(int)PARAM_TYPE.DIRECTION],
+                                SqlDbType = (SqlDbType)dr[(int)PARAM_TYPE.TYPE],
+                                Value = dr[(int)PARAM_TYPE.VALUE].ToString(),
+                            };
+
+                            if (dr[(int)PARAM_TYPE.LENGTH].ToString() != "")
+                            {
+                                if (int.Parse(dr[(int)PARAM_TYPE.LENGTH].ToString()) > 0)
+                                    param.Size = int.Parse(dr[(int)PARAM_TYPE.LENGTH].ToString());
                             }
+
                             m_SqlCmd.Parameters.Add(param);
                         }
 
-                        m_SqlCmd.CommandTimeout = 300;
-
                         SqlDataAdapter da = new SqlDataAdapter(m_SqlCmd);
                         da.Fill(dt);
                     }
@@ -246,117 +221,110 @@ namespace shDB
                 //}
             }
 
-            /// <summary>
-            /// 읽기 저장프로시저 실행 : 인자(데이터테이블)가 있는 경우
-            /// </summary>
-            /// <param name="Conn">DB연결객체</param>
-            /// <param name="strQuery">Text쿼리</param>
-            /// <returns>Select결과</returns>
-            public DataTable executeQuery_Text(SqlConnection Conn, string strQuery)
+            public int ExecuteTransQuery_Text(SqlConnection _Connection, string _sQuery)
             {
-                DataTable dt = new DataTable();
+                string sErrRtn;
                 try
                 {
-                    if (Conn.State == ConnectionState.Open)
+                    if (_Connection.State == ConnectionState.Open)
                     {
-                        SqlCommand m_SqlCmd = new SqlCommand();
-                        m_SqlCmd.Connection = Conn;
-                        m_SqlCmd.CommandType = CommandType.Text;
-                        m_SqlCmd.CommandText = strQuery;
-
-                        m_SqlCmd.CommandTimeout = 300;
-
-                        SqlDataAdapter da = new SqlDataAdapter(m_SqlCmd);
-                        da.Fill(dt);
-                    }
-                    return dt;
-                }
-                catch (Exception ex)
-                {
-                    throw new ApplicationException(System.Reflection.MethodBase.GetCurrentMethod().Name, ex);
-                }
-                //finally
-                //{
-                //}
-            }
-
-
-            /// <summary>
-            /// 트랜잭션(DML) 저장프로시저 실행 : 인자(데이터테이블)가 있는 경우
-            /// </summary>
-            /// <param name="Conn">DB연결객체</param>
-            /// <param name="Trans">트랜잭션객체</param>
-            /// <param name="strSPName">SP명</param>
-            /// <param name="dtSPParameter">인자배열</param>
-            /// <returns>DML실행결과</returns>
-            public string executeTransQuery_Proc(SqlConnection Conn, SqlTransaction Trans, string strSPName, DataTable dtSPParameter)
-            {
-                TransErrRtn Result = new TransErrRtn();
-                string strErrRtn = "";
-                try
-                {
-                    if (Conn.State == ConnectionState.Open)
-                    {
-                        SqlCommand m_SqlCmd = new SqlCommand();
-                        m_SqlCmd.Connection = Conn;
-                        m_SqlCmd.Transaction = Trans;
-                        m_SqlCmd.CommandType = CommandType.StoredProcedure;
-                        m_SqlCmd.CommandText = strSPName;
-
-                        m_SqlCmd.CommandTimeout = 300;
-
-                        foreach (DataRow dr in dtSPParameter.Rows)
+                        SqlCommand m_SqlCmd = new SqlCommand()
                         {
-                            SqlParameter param = new SqlParameter();
-                            param.ParameterName = dr["ParamName"].ToString();
-                            param.Direction = (ParameterDirection)dr["ParamDirect"];
-                            param.SqlDbType = (SqlDbType)dr["DBType"];
-                            param.IsNullable = true;
+                            Connection = _Connection,
+                            CommandType = CommandType.Text,
+                            CommandText = _sQuery,
+                        };
 
-                            if ((SqlDbType)dr["DBType"] != SqlDbType.Image)
-                                param.Value = dr["Value"].ToString();
+                        return m_SqlCmd.ExecuteNonQuery();
+                    }
+                    else
+                    {
+                        return -1;
+                    }
+                }
+                catch (Exception ex)
+                {
+                    return -1;
+                }
+            }
+
+            /// <summary>
+            /// exec sp with transction, exist param
+            /// </summary>
+            /// <param name="_Connection">ConnectionB</param>
+            /// <param name="_Trans">Transaction</param>
+            /// <param name="_sSPName">SP name</param>
+            /// <param name="_dtParam">param</param>
+            /// <returns></returns>
+            public string ExecuteTransQuery_SP(SqlConnection _Connection, SqlTransaction _Trans, string _sSPName, DataTable _dtParam)
+            {
+                CTransactionErr TransErr = new CTransactionErr();
+                string sErrRtn;
+                try
+                {
+                    if (_Connection.State == ConnectionState.Open)
+                    {
+                        SqlCommand m_SqlCmd = new SqlCommand()
+                        {
+                            Connection = _Connection,
+                            Transaction = _Trans,
+                            CommandType = CommandType.StoredProcedure,
+                            CommandText = _sSPName,
+                        };
+
+                        foreach (DataRow dr in _dtParam.Rows)
+                        {
+                            SqlParameter param = new SqlParameter()
+                            {
+                                ParameterName = dr[(int)PARAM_TYPE.NAME].ToString(),
+                                Direction = (ParameterDirection)dr[(int)PARAM_TYPE.DIRECTION],
+                                SqlDbType = (SqlDbType)dr[(int)PARAM_TYPE.TYPE],
+                                IsNullable = true,
+                            };
+
+                            if ((SqlDbType)dr[(int)PARAM_TYPE.TYPE] != SqlDbType.Image)
+                                param.Value = dr[(int)PARAM_TYPE.VALUE].ToString();
                             else
-                                param.Value = (byte[])dr["Value"];
+                                param.Value = (byte[])dr[(int)PARAM_TYPE.VALUE];
 
-                            if (dr["Length"].ToString() != "")
+                            if (dr[(int)PARAM_TYPE.LENGTH].ToString() != "")
                             {
-                                if (Convert.ToInt32(dr["Length"].ToString()) > 0)
-                                    param.Size = Convert.ToInt32(dr["Length"].ToString());
+                                if (int.Parse(dr[(int)PARAM_TYPE.LENGTH].ToString()) > 0)
+                                    param.Size = int.Parse(dr[(int)PARAM_TYPE.LENGTH].ToString());
                             }
 
                             m_SqlCmd.Parameters.Add(param);
                         }
 
-                        string strReturn = Convert.ToString(m_SqlCmd.ExecuteScalar());
-                        //m_SqlCmd.ExecuteNonQuery();
+                        m_SqlCmd.ExecuteScalar();
 
-                        //처리 결과를 구조체 변수에 저장시킴
-                        Result.ErrNum = Convert.ToInt32(m_SqlCmd.Parameters["@Rtn"].Value);
-                        Result.ErrMessage = m_SqlCmd.Parameters["@ErrorMessage"].Value.ToString();
-                        //Output Param이 있는 경우 ArrayList에 저장시킴.
-                        Result.mfInitReturnValue();
-                        foreach (DataRow dr in dtSPParameter.Rows)
+                        TransErr.ErrNum = int.Parse(m_SqlCmd.Parameters["@Rtn"].Value.ToString());
+                        TransErr.ErrMsg = m_SqlCmd.Parameters["@ErrMsg"].Value.ToString();
+
+                        foreach (DataRow dr in _dtParam.Rows)
                         {
-                            if (dr["ParamName"].ToString() != "@ErrorMessage" && (ParameterDirection)dr["ParamDirect"] == ParameterDirection.Output)
+                            if (dr[(int)PARAM_TYPE.NAME].ToString() != "@ErrMsg" && (ParameterDirection)dr[(int)PARAM_TYPE.DIRECTION] == ParameterDirection.Output)
                             {
-                                Result.mfAddReturnValue(m_SqlCmd.Parameters[dr["ParamName"].ToString()].Value.ToString());
+                                TransErr.AddOutput(m_SqlCmd.Parameters[dr[(int)PARAM_TYPE.NAME].ToString()].Value.ToString());
                             }
                         }
-                        strErrRtn = Result.mfEncodingErrMessage(Result);
-                        return strErrRtn;
+                        sErrRtn = TransErr.EncodingErrTransaction();
+                        return sErrRtn;
                     }
                     else
                     {
-                        Result.ErrNum = 99;
-                        Result.ErrMessage = "DataBase 연결되지 않았습니다.";
-                        strErrRtn = Result.mfEncodingErrMessage(Result);
-                        return strErrRtn;
+                        TransErr.ErrNum = -9999;
+                        TransErr.ErrMsg = "DB Disconnect";
+                        sErrRtn = TransErr.EncodingErrTransaction();
+                        return sErrRtn;
                     }
-
                 }
                 catch (Exception ex)
                 {
-                    throw new ApplicationException(System.Reflection.MethodBase.GetCurrentMethod().Name, ex);
+                    TransErr.Exception = $"{ex.Message}\n{ex.StackTrace}\n{ex.InnerException}";
+                    TransErr.ErrNum = -9999;
+                    sErrRtn = TransErr.EncodingErrTransaction();
+                    return sErrRtn;
                 }
                 //finally
                 //{
@@ -365,27 +333,25 @@ namespace shDB
 
             #endregion
 
-
-
-            #region 저장프로시져에 넘겨줄 Parameter 정의
+            #region Parameter
             /// <summary>
-            /// 저장프로시져에 넘겨줄 Parameter 데이터테이블 설정
+            /// set parameter
             /// </summary>
-            /// <returns>Parameter테이블</returns>
-            public DataTable setParam()
+            /// <returns>Parameter table</returns>
+            public DataTable SetParam()
             {
-                DataTable dt = null;
+                DataTable dt;
                 try
                 {
                     dt = new DataTable();
 
-                    DataColumn dc = new DataColumn("ParamName", typeof(string));
+                    DataColumn dc = new DataColumn("Name", typeof(string));
                     dt.Columns.Add(dc);
 
-                    dc = new DataColumn("ParamDirect", typeof(ParameterDirection));
+                    dc = new DataColumn("Direction", typeof(ParameterDirection));
                     dt.Columns.Add(dc);
 
-                    dc = new DataColumn("DBType", typeof(SqlDbType));
+                    dc = new DataColumn("Type", typeof(SqlDbType));
                     dt.Columns.Add(dc);
 
                     dc = new DataColumn("Value", typeof(object));
@@ -398,27 +364,28 @@ namespace shDB
                 }
                 catch (Exception ex)
                 {
-                    throw ex;
+                    throw new ApplicationException(System.Reflection.MethodBase.GetCurrentMethod().Name, ex);
                 }
             }
 
             /// <summary>
-            /// 저장프로시져에 넘겨줄 Parameter 추가
+            /// add parameter
             /// </summary>
-            /// <param name="dt">Parameter 테이블</param>
-            /// <param name="strName">Paramter 명</param>
-            /// <param name="Direction">Parameter 방향(in/out)</param>
-            /// <param name="DBType">Parameter DB유형</param>
-            public void addParam(DataTable dt, string strName, ParameterDirection Direction, SqlDbType DBType)
+            /// <param name="_dt">Parameter table</param>
+            /// <param name="_sName">Paramter name</param>
+            /// <param name="_Direction">in/out</param>
+            /// <param name="_Type">Value type</param>
+            /// <param name="_nSize">Value size</param>
+            public void AddParam(DataTable _dt, string _sName, ParameterDirection _Direction, SqlDbType _Type, int _nSize = 0)
             {
                 try
                 {
-                    DataRow dr = dt.NewRow();
-                    dr["ParamName"] = strName;
-                    dr["ParamDirect"] = Direction;
-                    dr["DBType"] = DBType;
-                    //dr["Length"] = intSize;
-                    dt.Rows.Add(dr);
+                    DataRow dr = _dt.NewRow();
+                    dr[(int)PARAM_TYPE.NAME] = _sName;
+                    dr[(int)PARAM_TYPE.DIRECTION] = _Direction;
+                    dr[(int)PARAM_TYPE.TYPE] = _Type;
+                    dr[(int)PARAM_TYPE.LENGTH] = _nSize;
+                    _dt.Rows.Add(dr);
                 }
                 catch (Exception ex)
                 {
@@ -428,43 +395,25 @@ namespace shDB
                 //{
                 //}
             }
-            public void addParam(DataTable dt, string strName, ParameterDirection Direction, SqlDbType DBType, int intSize)
-            {
-                try
-                {
-                    DataRow dr = dt.NewRow();
-                    dr["ParamName"] = strName;
-                    dr["ParamDirect"] = Direction;
-                    dr["DBType"] = DBType;
-                    dr["Length"] = intSize;
-                    dt.Rows.Add(dr);
-                }
-                catch (Exception ex)
-                {
-                    throw new ApplicationException(System.Reflection.MethodBase.GetCurrentMethod().Name, ex);
-                }
-                //finally
-                //{
-                //}
-            }
+
             /// <summary>
-            /// 저장프로시져에 넘겨줄 Parameter 추가
+            /// add parameter
             /// </summary>
-            /// <param name="dt">Parameter 테이블</param>
-            /// <param name="Direction">Parameter 방향(in/out)</param>
-            /// <param name="DBType">Parameter DB유형</param>
-            /// <param name="strValue">Paramter 인자값</param>
-            public void addParam(DataTable dt, string strName, ParameterDirection Direction, SqlDbType DBType, string strValue)
+            /// <param name="_dt">Parameter table</param>
+            /// <param name="_sName">Paramter name</param>
+            /// <param name="_Direction">in/out</param>
+            /// <param name="_Type">Value type</param>
+            /// <param name="_sValue">Value</param>
+            public void AddParam(DataTable _dt, string _sName, ParameterDirection _Direction, SqlDbType _Type, string _sValue)
             {
                 try
                 {
-                    DataRow dr = dt.NewRow();
-                    dr["ParamName"] = strName;
-                    dr["ParamDirect"] = Direction;
-                    dr["DBType"] = DBType;
-                    dr["Value"] = strValue;
-                    //dr["Length"] = intSize;
-                    dt.Rows.Add(dr);
+                    DataRow dr = _dt.NewRow();
+                    dr[(int)PARAM_TYPE.NAME] = _sName;
+                    dr[(int)PARAM_TYPE.DIRECTION] = _Direction;
+                    dr[(int)PARAM_TYPE.TYPE] = _Type;
+                    dr[(int)PARAM_TYPE.VALUE] = _sValue;
+                    _dt.Rows.Add(dr);
                 }
                 catch (Exception ex)
                 {
@@ -474,17 +423,27 @@ namespace shDB
                 //{
                 //}
             }
-            public void addParam(DataTable dt, string strName, ParameterDirection Direction, SqlDbType DBType, string strValue, int intSize)
+
+            /// <summary>
+            /// add parameter
+            /// </summary>
+            /// <param name="_dt">Parameter table</param>
+            /// <param name="_sName">Paramter name</param>
+            /// <param name="_Direction">in/out</param>
+            /// <param name="_Type">Value type</param>
+            /// <param name="_sValue">Value</param>
+            /// <param name="_nSize">Value size</param>
+            public void AddParam(DataTable _dt, string _sName, ParameterDirection _Direction, SqlDbType _Type, string _sValue, int _nSize = 0)
             {
                 try
                 {
-                    DataRow dr = dt.NewRow();
-                    dr["ParamName"] = strName;
-                    dr["ParamDirect"] = Direction;
-                    dr["DBType"] = DBType;
-                    dr["Value"] = strValue;
-                    dr["Length"] = intSize;
-                    dt.Rows.Add(dr);
+                    DataRow dr = _dt.NewRow();
+                    dr[(int)PARAM_TYPE.NAME] = _sName;
+                    dr[(int)PARAM_TYPE.DIRECTION] = _Direction;
+                    dr[(int)PARAM_TYPE.TYPE] = _Type;
+                    dr[(int)PARAM_TYPE.VALUE] = _sValue;
+                    dr[(int)PARAM_TYPE.LENGTH] = _nSize;
+                    _dt.Rows.Add(dr);
                 }
                 catch (Exception ex)
                 {
@@ -498,242 +457,22 @@ namespace shDB
             #endregion
         }
 
-        #region 트랜잭션 처리시 Return 처리 Class
-        [Serializable]
-        public class TransErrRtn
-        {
-            private int intErrNum;              //에러번호
-            private string strErrMessage;       //에러메세지    
-                                                //private ArrayList arrReturnValue;   //반환할 결과값
-            private ArrayList arrReturnValue = new ArrayList();
-            private string strSystemMessage;
-            private string strSystemStackTrace;
-            private string strSystemInnerException;
-            private string strInterfaceResultCode;
-            private string strInterfaceResultMessage;
-
-            public int ErrNum
-            {
-                get { return intErrNum; }
-                set { intErrNum = value; }
-            }
-
-            public string ErrMessage
-            {
-                get { return strErrMessage; }
-                set { strErrMessage = value; }
-            }
-
-            public string SystemMessage
-            {
-                get { return strSystemMessage; }
-                set { strSystemMessage = value; }
-            }
-
-            public string SystemStackTrace
-            {
-                get { return strSystemStackTrace; }
-                set { strSystemStackTrace = value; }
-            }
-
-            public string SystemInnerException
-            {
-                get { return strSystemInnerException; }
-                set { strSystemInnerException = value; }
-            }
-
-            public string InterfaceResultCode
-            {
-                get { return strInterfaceResultCode; }
-                set { strInterfaceResultCode = value; }
-            }
-
-            public string InterfaceResultMessage
-            {
-                get { return strInterfaceResultMessage; }
-                set { strInterfaceResultMessage = value; }
-            }
-
-            public TransErrRtn()
-            {
-                intErrNum = 0;
-                strErrMessage = "";
-                //arrReturnValue = null;
-                //arrReturnValue.Clear();
-                strSystemMessage = "";
-                strSystemStackTrace = "";
-                strSystemInnerException = "";
-                strInterfaceResultCode = "";
-                strInterfaceResultMessage = "";
-            }
-
-            /// <summary>
-            /// 리턴값 배열 초기화
-            /// </summary>
-            public void mfInitReturnValue()
-            {
-                arrReturnValue.Clear();
-            }
-
-            /// <summary>
-            /// 리턴값 배열에 값을 추가
-            /// </summary>
-            /// <param name="strValue"></param>
-            public void mfAddReturnValue(string strValue)
-            {
-                arrReturnValue.Add(strValue);
-            }
-
-            /// <summary>
-            /// 리턴갑 배열에 값을 삭제
-            /// </summary>
-            /// <param name="intIndex"></param>
-            public void mfDeleteReturnValue(int intIndex)
-            {
-                arrReturnValue.Remove(intIndex);
-            }
-
-            /// <summary>
-            /// 리턴값 배열 얻기
-            /// </summary>
-            /// <returns></returns>
-            public ArrayList mfGetReturnValue()
-            {
-                return arrReturnValue;
-            }
-
-            /// <summary>
-            /// 리턴갑 배열중 특정값 얻기
-            /// </summary>
-            /// <param name="intIndex"></param>
-            /// <returns></returns>
-            public string mfGetReturnValue(int intIndex)
-            {
-                if (arrReturnValue.Count >= intIndex + 1)
-                {
-                    return arrReturnValue[intIndex].ToString();
-                }
-                else
-                {
-                    return string.Empty;
-                }
-            }
-
-            /// <summary>
-            /// 에러메세지 구조체 정보를 문자열로 변환
-            /// </summary>
-            /// <param name="Err">트랜잭션처리정보 구조체</param>
-            /// <returns>Encoding값</returns>
-            public string mfEncodingErrMessage(TransErrRtn Err)
-            {
-                string strErr = "";
-                string strErrSep = "<Err>";
-                string strOutSep = "<OUT>";
-                try
-                {
-                    strErr = Err.intErrNum.ToString() + strErrSep +
-                             Err.strErrMessage + strErrSep +
-                             Err.strSystemMessage + strErrSep +
-                             Err.strSystemStackTrace + strErrSep +
-                             Err.strSystemInnerException + strErrSep +
-                             Err.strInterfaceResultCode + strErrSep +       //추가
-                             Err.strInterfaceResultMessage + strErrSep;     //추가
-
-                    if (Err.arrReturnValue.Count > 0)
-                    {
-                        //strErr = strErr + "OUTPUT";
-                        for (int i = 0; i < Err.arrReturnValue.Count; i++)
-                        {
-                            strErr = strErr + Err.arrReturnValue[i].ToString() + strOutSep;
-                        }
-                    }
-                    return strErr;
-
-                }
-                catch //(Exception ex)
-                {
-                    return strErr;
-                }
-                finally
-                {
-                }
-            }
-
-            /// <summary>
-            /// 에러메시지 문자를 구조체로 변환
-            /// </summary>
-            /// <param name="strErr">트랜잭션처리정보 문자열</param>
-            /// <returns>Decoding값</returns>
-            public TransErrRtn mfDecodingErrMessage(string strErr)
-            {
-                TransErrRtn errMsg = new TransErrRtn();
-                try
-                {
-                    string[] arrErrSep = { "<Err>" };
-                    string[] arrOutSep = { "<OUT>" };
-
-                    string[] arrErrMsg = strErr.Split(arrErrSep, StringSplitOptions.None);
-
-                    errMsg.intErrNum = Convert.ToInt32(arrErrMsg[0]);
-                    if (arrErrMsg.Length > 1)
-                        errMsg.strErrMessage = arrErrMsg[1];
-
-                    if (arrErrMsg.Length > 2)
-                        errMsg.strSystemMessage = arrErrMsg[2];
-
-                    if (arrErrMsg.Length > 3)
-                        errMsg.strSystemStackTrace = arrErrMsg[3];
-
-                    if (arrErrMsg.Length > 4)
-                        errMsg.strSystemInnerException = arrErrMsg[4];
-
-                    if (arrErrMsg.Length > 5)
-                        errMsg.strInterfaceResultCode = arrErrMsg[5];       //추가
-
-                    if (arrErrMsg.Length > 6)
-                        errMsg.strInterfaceResultMessage = arrErrMsg[6];    //추가
-
-
-                    if (strErr.Split(arrOutSep, StringSplitOptions.None).Length > 0)
-                    {
-                        string strtemp = strErr.Substring(strErr.LastIndexOf("<Err>") + arrErrSep[0].Length, strErr.Length - strErr.LastIndexOf("<Err>") - arrErrSep[0].Length);
-                        string[] arrOutput = strtemp.Split(arrOutSep, StringSplitOptions.None);
-
-                        for (int i = 0; i < arrOutput.Length - 1; i++)
-                            errMsg.mfAddReturnValue(arrOutput[i]);
-                    }
-                    return errMsg;
-                }
-                catch //(Exception ex)
-                {
-                    return errMsg;
-                }
-                finally
-                {
-                }
-            }
-        }
-        #endregion
     }
 
-    namespace ORACLE
-    {
-
-    }
+    
 
     namespace ACCESS
     {
-        public class SQLS : IDisposable
+        public class CSQL : IDisposable
         {
-            private System.ComponentModel.Component m_component;
-            private string m_strConnString;
+            private readonly string m_sConnectionString;
             private static OleDbConnection m_SqlCon;
             private static OleDbTransaction m_Trans;
 
             #region con
             public string ConnString
             {
-                get { return m_strConnString; }
+                get { return m_sConnectionString; }
             }
 
             public OleDbConnection SqlCon
@@ -741,45 +480,33 @@ namespace shDB
                 get { return m_SqlCon; }
             }
 
-            /// <summary>
-            /// 생성자 : Web.Config에서 DB연결정보 얻기
-            /// </summary>
-            public SQLS()
-            {
-                m_component = new System.ComponentModel.Component();
-                try
-                {
-                    m_strConnString = "Provider=Microsoft.ACE.OLEDB.12.0;Data Source=C:\\Users\\user5\\Documents\\Database1.accdb;";
-                }
-                catch (Exception ex)
-                {
-                    throw new ApplicationException(System.Reflection.MethodBase.GetCurrentMethod().Name, ex);
-                }
-                //finally
-                //{
-                //}
-            }
+            //public CSQL()
+            //{
+            //    try
+            //    {
+            //        m_sConnectionString = "Provider=Microsoft.ACE.OLEDB.12.0;Data Source=C:\\Users\\user5\\Documents\\Database1.accdb;";
+            //    }
+            //    catch (Exception ex)
+            //    {
+            //        throw new ApplicationException(System.Reflection.MethodBase.GetCurrentMethod().Name, ex);
+            //    }
+            //    //finally
+            //    //{
+            //    //}
+            //}
 
-            /// <summary>
-            /// 생성자 : DB연결정보 얻기
-            /// </summary>
-            /// <param name="strConnection">연결문자</param>
-            public SQLS(string strConnection)
+            public CSQL(string _sConnection)
             {
-                m_component = new System.ComponentModel.Component();
                 try
                 {
-                    m_strConnString = strConnection;
+                    m_sConnectionString = _sConnection;
                 }
                 catch (Exception ex)
                 {
                     throw new ApplicationException(System.Reflection.MethodBase.GetCurrentMethod().Name, ex);
                 }
-                //finally
-                //{
-                //}
             }
-            ~SQLS()
+            ~CSQL()
             {
                 Dispose(false);
             }
@@ -789,14 +516,8 @@ namespace shDB
                 Dispose(true);
             }
 
-            protected virtual void Dispose(bool bolDisposing)
+            protected virtual void Dispose(bool _bDisposing)
             {
-                if (bolDisposing)
-                {
-                    if (m_component != null)
-                        m_component.Dispose();
-                }
-
                 GC.SuppressFinalize(this);
             }
             #endregion
@@ -808,21 +529,6 @@ namespace shDB
                 try
                 {
                     m_Trans = m_SqlCon.BeginTransaction();
-                }
-                catch (Exception ex)
-                {
-                    throw new ApplicationException(System.Reflection.MethodBase.GetCurrentMethod().Name, ex);
-                }
-            }
-
-            public void TransactionHandling(int ErrNum)
-            {
-                try
-                {
-                    if (ErrNum.Equals(0))
-                        m_Trans.Commit();
-                    else
-                        m_Trans.Rollback();
                 }
                 catch (Exception ex)
                 {
@@ -845,30 +551,23 @@ namespace shDB
             }
             #endregion
 
-            #region MS-SQL 서버 연결 및 해제
-            /// <summary>
-            /// MS-ACCESS 서버 연결.
-            /// </summary>
-            /// <returns>연결여부</returns>
-            public bool sql_Connect()
+            #region MS-ACCESS Connect, Disconnect
+            public bool Sql_Connect()
             {
                 try
                 {
-                    //연결정보가 없는 경우
-                    if (m_strConnString == "")
-                        return false;
-                    else
+                    if (m_sConnectionString != null)
                     {
-                        m_SqlCon = new OleDbConnection(m_strConnString);
-                        //Open상태가 아니면 Open한다.
+                        m_SqlCon = new OleDbConnection(m_sConnectionString);
+
                         if (m_SqlCon.State != ConnectionState.Open)
                             m_SqlCon.Open();
 
-                        if (m_SqlCon.State != ConnectionState.Open)
-                            return false;
-                        else
+                        if (m_SqlCon.State == ConnectionState.Open)
                             return true;
                     }
+
+                    return false;
                 }
                 catch (Exception ex)
                 {
@@ -879,22 +578,16 @@ namespace shDB
                 //}
             }
 
-            /// <summary>
-            /// MS-ACCESS 서버 연결 끊기.
-            /// </summary>
-            public void sql_DisConnect()
+            public void Sql_Disconnect()
             {
                 try
                 {
-                    if (m_SqlCon == null) return;
-
-                    if (m_SqlCon.State == ConnectionState.Open)
+                    if (m_SqlCon != null)
                     {
-                        m_SqlCon.Close();
+                        if (m_SqlCon.State == ConnectionState.Open)
+                            m_SqlCon.Close();
                         m_SqlCon = null;
                     }
-                    else
-                        m_SqlCon = null;
                 }
                 catch (Exception ex)
                 {
@@ -906,163 +599,113 @@ namespace shDB
             }
             #endregion
 
-            #region 저장프로시저 실행
+            #region Execute
 
             /// <summary>
-            /// 읽기 저장프로시저 실행 : 인자(데이터테이블)가 있는 경우
+            /// exec query
             /// </summary>
-            /// <param name="Conn">DB연결객체</param>
-            /// <param name="strSPName">SP명</param>
-            /// <param name="dtSPParameter">인자 배열</param>
-            /// <returns>Select결과</returns>
-            public DataTable executeQuery_Proc(OleDbConnection Conn, string strSPName, DataTable dtSPParameter)
+            /// <param name="_Connection">Connection</param>
+            /// <param name="_sQuery">Text query</param>
+            /// <returns></returns>
+            public DataTable ExecuteQuery_Text(OleDbConnection _Connection, string _sQuery)
             {
                 DataTable dt = new DataTable();
                 try
                 {
-                    if (Conn.State == ConnectionState.Open)
+                    if (_Connection.State == ConnectionState.Open)
                     {
-                        OleDbCommand m_SqlCmd = new OleDbCommand();
-                        m_SqlCmd.Connection = Conn;
-                        m_SqlCmd.CommandType = CommandType.StoredProcedure;
-                        m_SqlCmd.CommandText = strSPName;
-                        foreach (DataRow dr in dtSPParameter.Rows)
+                        OleDbCommand m_SqlCmd = new OleDbCommand()
                         {
-                            OleDbParameter param = new OleDbParameter();
-                            param.ParameterName = dr["ParamName"].ToString();
-                            param.Direction = (ParameterDirection)dr["ParamDirect"];
-                            param.OleDbType = (OleDbType)dr["DBType"];
+                            Connection = _Connection,
+                            CommandType = CommandType.Text,
+                            CommandText = _sQuery,
+                        };
 
-                            param.Value = dr["Value"].ToString();
-                            if (dr["Length"].ToString() != "")
+                        OleDbDataAdapter da = new OleDbDataAdapter(m_SqlCmd);
+                        da.Fill(dt);
+                    }
+                    return dt;
+                }
+                catch (Exception ex)
+                {
+                    throw new ApplicationException(System.Reflection.MethodBase.GetCurrentMethod().Name, ex);
+                }
+                //finally
+                //{
+                //}
+            }
+
+            /// <summary>
+            /// exec SP with transation, exist param
+            /// </summary>
+            /// <param name="_Connection">ConnectionB</param>
+            /// <param name="_Trans">transation</param>
+            /// <param name="_sSPName">SP name</param>
+            /// <param name="_dtParam">param</param>
+            /// <returns></returns>
+            public string ExecuteTransQuery_SP(OleDbConnection _Connection, OleDbTransaction _Trans, string _sSPName, DataTable _dtParam)
+            {
+                CTransactionErr TransErr = new CTransactionErr();
+                string sErrRtn;
+                try
+                {
+                    if (_Connection.State == ConnectionState.Open)
+                    {
+                        OleDbCommand m_SqlCmd = new OleDbCommand()
+                        {
+                            Connection = _Connection,
+                            Transaction = _Trans,
+                            CommandType = CommandType.StoredProcedure,
+                            CommandText = _sSPName,
+                        };
+
+                        foreach (DataRow dr in _dtParam.Rows)
+                        {
+                            OleDbParameter param = new OleDbParameter()
                             {
-                                if (Convert.ToInt32(dr["Length"].ToString()) > 0)
-                                    param.Size = Convert.ToInt32(dr["Length"].ToString());
-                            }
-                            m_SqlCmd.Parameters.Add(param);
-                        }
+                                ParameterName = dr[(int)PARAM_TYPE.NAME].ToString(),
+                                Direction = (ParameterDirection)dr[(int)PARAM_TYPE.DIRECTION],
+                                OleDbType = (OleDbType)dr[(int)PARAM_TYPE.TYPE],
+                                IsNullable = true
+                            };
 
-                        m_SqlCmd.CommandTimeout = 300;
-
-                        OleDbDataAdapter da = new OleDbDataAdapter(m_SqlCmd);
-                        da.Fill(dt);
-                    }
-                    return dt;
-                }
-                catch (Exception ex)
-                {
-                    throw new ApplicationException(System.Reflection.MethodBase.GetCurrentMethod().Name, ex);
-                }
-                //finally
-                //{
-                //}
-            }
-
-            /// <summary>
-            /// 읽기 저장프로시저 실행 : 인자(데이터테이블)가 있는 경우
-            /// </summary>
-            /// <param name="Conn">DB연결객체</param>
-            /// <param name="strQuery">Text쿼리</param>
-            /// <returns>Select결과</returns>
-            public DataTable executeQuery_Text(OleDbConnection Conn, string strQuery)
-            {
-                DataTable dt = new DataTable();
-                try
-                {
-                    if (Conn.State == ConnectionState.Open)
-                    {
-                        OleDbCommand m_SqlCmd = new OleDbCommand();
-                        m_SqlCmd.Connection = Conn;
-                        m_SqlCmd.CommandType = CommandType.Text;
-                        m_SqlCmd.CommandText = strQuery;
-
-                        m_SqlCmd.CommandTimeout = 300;
-
-                        OleDbDataAdapter da = new OleDbDataAdapter(m_SqlCmd);
-                        da.Fill(dt);
-                    }
-                    return dt;
-                }
-                catch (Exception ex)
-                {
-                    throw new ApplicationException(System.Reflection.MethodBase.GetCurrentMethod().Name, ex);
-                }
-                //finally
-                //{
-                //}
-            }
-
-
-            /// <summary>
-            /// 트랜잭션(DML) 저장프로시저 실행 : 인자(데이터테이블)가 있는 경우
-            /// </summary>
-            /// <param name="Conn">DB연결객체</param>
-            /// <param name="Trans">트랜잭션객체</param>
-            /// <param name="strSPName">SP명</param>
-            /// <param name="dtSPParameter">인자배열</param>
-            /// <returns>DML실행결과</returns>
-            public string executeTransQuery_Proc(OleDbConnection Conn, OleDbTransaction Trans, string strSPName, DataTable dtSPParameter)
-            {
-                TransErrRtn Result = new TransErrRtn();
-                string strErrRtn = "";
-                try
-                {
-                    if (Conn.State == ConnectionState.Open)
-                    {
-                        OleDbCommand m_SqlCmd = new OleDbCommand();
-                        m_SqlCmd.Connection = Conn;
-                        m_SqlCmd.Transaction = Trans;
-                        m_SqlCmd.CommandType = CommandType.StoredProcedure;
-                        m_SqlCmd.CommandText = strSPName;
-
-                        m_SqlCmd.CommandTimeout = 300;
-
-                        foreach (DataRow dr in dtSPParameter.Rows)
-                        {
-                            OleDbParameter param = new OleDbParameter();
-                            param.ParameterName = dr["ParamName"].ToString();
-                            param.Direction = (ParameterDirection)dr["ParamDirect"];
-                            param.OleDbType = (OleDbType)dr["DBType"];
-                            param.IsNullable = true;
-
-                            //if ((OleDbType)dr["DBType"] != OleDbType.Image)
-                            //    param.Value = dr["Value"].ToString();
+                            //if ((OleDbType)dr[(int)PARAM_TYPE.TYPE] != OleDbType.Image)
+                            //    param.Value = dr[(int)PARAM_TYPE.VALUE].ToString();
                             //else
-                            //    param.Value = (byte[])dr["Value"];
+                            //    param.Value = (byte[])dr[(int)PARAM_TYPE.VALUE];
+                            param.Value = dr[(int)PARAM_TYPE.VALUE].ToString();
 
-                            if (dr["Length"].ToString() != "")
+                            if (dr[(int)PARAM_TYPE.LENGTH].ToString() != "")
                             {
-                                if (Convert.ToInt32(dr["Length"].ToString()) > 0)
-                                    param.Size = Convert.ToInt32(dr["Length"].ToString());
+                                if (int.Parse(dr[(int)PARAM_TYPE.LENGTH].ToString()) > 0)
+                                    param.Size = int.Parse(dr[(int)PARAM_TYPE.LENGTH].ToString());
                             }
 
                             m_SqlCmd.Parameters.Add(param);
                         }
 
-                        string strReturn = Convert.ToString(m_SqlCmd.ExecuteScalar());
-                        //m_SqlCmd.ExecuteNonQuery();
+                        m_SqlCmd.ExecuteScalar();
 
                         //처리 결과를 구조체 변수에 저장시킴
-                        Result.ErrNum = Convert.ToInt32(m_SqlCmd.Parameters["@Rtn"].Value);
-                        Result.ErrMessage = m_SqlCmd.Parameters["@ErrorMessage"].Value.ToString();
-                        //Output Param이 있는 경우 ArrayList에 저장시킴.
-                        Result.mfInitReturnValue();
-                        foreach (DataRow dr in dtSPParameter.Rows)
+                        TransErr.ErrNum = int.Parse(m_SqlCmd.Parameters["@Rtn"].Value.ToString());
+                        TransErr.ErrMsg = m_SqlCmd.Parameters["@ErrMsg"].Value.ToString();
+
+                        foreach (DataRow dr in _dtParam.Rows)
                         {
-                            if (dr["ParamName"].ToString() != "@ErrorMessage" && (ParameterDirection)dr["ParamDirect"] == ParameterDirection.Output)
+                            if (dr[(int)PARAM_TYPE.NAME].ToString() != "@ErrMsg" && (ParameterDirection)dr[(int)PARAM_TYPE.DIRECTION] == ParameterDirection.Output)
                             {
-                                Result.mfAddReturnValue(m_SqlCmd.Parameters[dr["ParamName"].ToString()].Value.ToString());
+                                TransErr.AddOutput(m_SqlCmd.Parameters[dr[(int)PARAM_TYPE.NAME].ToString()].Value.ToString());
                             }
                         }
-                        strErrRtn = Result.mfEncodingErrMessage(Result);
-                        return strErrRtn;
+                        sErrRtn = TransErr.EncodingErrTransaction();
+                        return sErrRtn;
                     }
                     else
                     {
-                        Result.ErrNum = 99;
-                        Result.ErrMessage = "DataBase 연결되지 않았습니다.";
-                        strErrRtn = Result.mfEncodingErrMessage(Result);
-                        return strErrRtn;
+                        TransErr.ErrNum = 99;
+                        TransErr.ErrMsg = "DB Disconnect";
+                        sErrRtn = TransErr.EncodingErrTransaction();
+                        return sErrRtn;
                     }
 
                 }
@@ -1077,27 +720,25 @@ namespace shDB
 
             #endregion
 
-
-
-            #region 저장프로시져에 넘겨줄 Parameter 정의
+            #region Parameter
             /// <summary>
-            /// 저장프로시져에 넘겨줄 Parameter 데이터테이블 설정
+            /// set param table
             /// </summary>
-            /// <returns>Parameter테이블</returns>
-            public DataTable setParam()
+            /// <returns>Parameter table</returns>
+            public DataTable SetParam()
             {
-                DataTable dt = null;
+                DataTable dt;
                 try
                 {
                     dt = new DataTable();
 
-                    DataColumn dc = new DataColumn("ParamName", typeof(string));
+                    DataColumn dc = new DataColumn("Name", typeof(string));
                     dt.Columns.Add(dc);
 
-                    dc = new DataColumn("ParamDirect", typeof(ParameterDirection));
+                    dc = new DataColumn("Direction", typeof(ParameterDirection));
                     dt.Columns.Add(dc);
 
-                    dc = new DataColumn("DBType", typeof(OleDbType));
+                    dc = new DataColumn("Type", typeof(OleDbType));
                     dt.Columns.Add(dc);
 
                     dc = new DataColumn("Value", typeof(object));
@@ -1110,27 +751,28 @@ namespace shDB
                 }
                 catch (Exception ex)
                 {
-                    throw ex;
+                    throw new ApplicationException(System.Reflection.MethodBase.GetCurrentMethod().Name, ex);
                 }
             }
 
             /// <summary>
-            /// 저장프로시져에 넘겨줄 Parameter 추가
+            /// add parameter
             /// </summary>
-            /// <param name="dt">Parameter 테이블</param>
-            /// <param name="strName">Paramter 명</param>
-            /// <param name="Direction">Parameter 방향(in/out)</param>
-            /// <param name="DBType">Parameter DB유형</param>
-            public void addParam(DataTable dt, string strName, ParameterDirection Direction, OleDbType DBType)
+            /// <param name="_dt">Parameter table</param>
+            /// <param name="_sName">Paramter name</param>
+            /// <param name="_Direction">in/out</param>
+            /// <param name="_Type">Value type</param>
+            /// <param name="_nSize">Value size</param>
+            public void AddParam(DataTable _dt, string _sName, ParameterDirection _Direction, OleDbType _Type, int _nSize = 0)
             {
                 try
                 {
-                    DataRow dr = dt.NewRow();
-                    dr["ParamName"] = strName;
-                    dr["ParamDirect"] = Direction;
-                    dr["DBType"] = DBType;
-                    //dr["Length"] = intSize;
-                    dt.Rows.Add(dr);
+                    DataRow dr = _dt.NewRow();
+                    dr[(int)PARAM_TYPE.NAME] = _sName;
+                    dr[(int)PARAM_TYPE.DIRECTION] = _Direction;
+                    dr[(int)PARAM_TYPE.TYPE] = _Type;
+                    dr[(int)PARAM_TYPE.LENGTH] = _nSize;
+                    _dt.Rows.Add(dr);
                 }
                 catch (Exception ex)
                 {
@@ -1140,43 +782,25 @@ namespace shDB
                 //{
                 //}
             }
-            public void addParam(DataTable dt, string strName, ParameterDirection Direction, OleDbType DBType, int intSize)
-            {
-                try
-                {
-                    DataRow dr = dt.NewRow();
-                    dr["ParamName"] = strName;
-                    dr["ParamDirect"] = Direction;
-                    dr["DBType"] = DBType;
-                    dr["Length"] = intSize;
-                    dt.Rows.Add(dr);
-                }
-                catch (Exception ex)
-                {
-                    throw new ApplicationException(System.Reflection.MethodBase.GetCurrentMethod().Name, ex);
-                }
-                //finally
-                //{
-                //}
-            }
+
             /// <summary>
-            /// 저장프로시져에 넘겨줄 Parameter 추가
+            /// add parameter
             /// </summary>
-            /// <param name="dt">Parameter 테이블</param>
-            /// <param name="Direction">Parameter 방향(in/out)</param>
-            /// <param name="DBType">Parameter DB유형</param>
-            /// <param name="strValue">Paramter 인자값</param>
-            public void addParam(DataTable dt, string strName, ParameterDirection Direction, OleDbType DBType, string strValue)
+            /// <param name="_dt">Parameter table</param>
+            /// <param name="_sName">Paramter name</param>
+            /// <param name="_Direction">in/out</param>
+            /// <param name="_Type">Value type</param>
+            /// <param name="_sValue">Value</param>
+            public void AddParam(DataTable _dt, string _sName, ParameterDirection _Direction, OleDbType _Type, string _sValue)
             {
                 try
                 {
-                    DataRow dr = dt.NewRow();
-                    dr["ParamName"] = strName;
-                    dr["ParamDirect"] = Direction;
-                    dr["DBType"] = DBType;
-                    dr["Value"] = strValue;
-                    //dr["Length"] = intSize;
-                    dt.Rows.Add(dr);
+                    DataRow dr = _dt.NewRow();
+                    dr[(int)PARAM_TYPE.NAME] = _sName;
+                    dr[(int)PARAM_TYPE.DIRECTION] = _Direction;
+                    dr[(int)PARAM_TYPE.TYPE] = _Type;
+                    dr[(int)PARAM_TYPE.VALUE] = _sValue;
+                    _dt.Rows.Add(dr);
                 }
                 catch (Exception ex)
                 {
@@ -1186,17 +810,17 @@ namespace shDB
                 //{
                 //}
             }
-            public void addParam(DataTable dt, string strName, ParameterDirection Direction, OleDbType DBType, string strValue, int intSize)
+            public void AddParam(DataTable _dt, string _sName, ParameterDirection _Direction, OleDbType _Type, string _sValue, int _nSize = 0)
             {
                 try
                 {
-                    DataRow dr = dt.NewRow();
-                    dr["ParamName"] = strName;
-                    dr["ParamDirect"] = Direction;
-                    dr["DBType"] = DBType;
-                    dr["Value"] = strValue;
-                    dr["Length"] = intSize;
-                    dt.Rows.Add(dr);
+                    DataRow dr = _dt.NewRow();
+                    dr[(int)PARAM_TYPE.NAME] = _sName;
+                    dr[(int)PARAM_TYPE.DIRECTION] = _Direction;
+                    dr[(int)PARAM_TYPE.TYPE] = _Type;
+                    dr[(int)PARAM_TYPE.VALUE] = _sValue;
+                    dr[(int)PARAM_TYPE.LENGTH] = _nSize;
+                    _dt.Rows.Add(dr);
                 }
                 catch (Exception ex)
                 {
@@ -1209,222 +833,168 @@ namespace shDB
 
             #endregion
         }
+    }
 
-        #region 트랜잭션 처리시 Return 처리 Class
-        [Serializable]
-        public class TransErrRtn
+    #region Transaction class
+    public class CTransactionErr
+    {
+        int nErrNum;
+        string sErrMsg;
+        string sException;
+        List<string> arrOutput;
+
+        string[] arrErrSep = { "<Err>" };
+        string[] arrOutSep = { "<OUT>" };
+
+        public int ErrNum
         {
-            private int intErrNum;              //에러번호
-            private string strErrMessage;       //에러메세지    
-                                                //private ArrayList arrReturnValue;   //반환할 결과값
-            private ArrayList arrReturnValue = new ArrayList();
-            private string strSystemMessage;
-            private string strSystemStackTrace;
-            private string strSystemInnerException;
-            private string strInterfaceResultCode;
-            private string strInterfaceResultMessage;
+            get { return nErrNum; }
+            set { nErrNum = value; }
+        }
 
-            public int ErrNum
+        public string ErrMsg
+        {
+            get { return sErrMsg; }
+            set { sErrMsg = value; }
+        }
+
+        public string Exception
+        {
+            get { return sException; }
+            set { sException = value; }
+        }
+
+        public CTransactionErr()
+        {
+            nErrNum = 0;
+            sErrMsg = "";
+            sException = "";
+            arrOutput = new List<string>();
+        }
+
+        /// <summary>
+        /// add return array
+        /// </summary>
+        /// <param name="_sValue"></param>
+        public void AddOutput(string _sValue)
+        {
+            arrOutput.Add(_sValue);
+        }
+
+        /// <summary>
+        /// delete return array by index
+        /// </summary>
+        /// <param name="_nIndex"></param>
+        public void DeleteOutput(int _nIndex)
+        {
+            arrOutput.RemoveAt(_nIndex);
+        }
+
+        /// <summary>
+        /// get return array
+        /// </summary>
+        /// <returns></returns>
+        public List<string> GetOutput()
+        {
+            return arrOutput;
+        }
+
+        /// <summary>
+        /// get return array by index
+        /// </summary>
+        /// <param name="_nIndex"></param>
+        /// <returns></returns>
+        public string GetOutput(int _nIndex)
+        {
+            if (arrOutput.Count >= _nIndex + 1)
             {
-                get { return intErrNum; }
-                set { intErrNum = value; }
+                return arrOutput[_nIndex];
             }
-
-            public string ErrMessage
+            else
             {
-                get { return strErrMessage; }
-                set { strErrMessage = value; }
-            }
-
-            public string SystemMessage
-            {
-                get { return strSystemMessage; }
-                set { strSystemMessage = value; }
-            }
-
-            public string SystemStackTrace
-            {
-                get { return strSystemStackTrace; }
-                set { strSystemStackTrace = value; }
-            }
-
-            public string SystemInnerException
-            {
-                get { return strSystemInnerException; }
-                set { strSystemInnerException = value; }
-            }
-
-            public string InterfaceResultCode
-            {
-                get { return strInterfaceResultCode; }
-                set { strInterfaceResultCode = value; }
-            }
-
-            public string InterfaceResultMessage
-            {
-                get { return strInterfaceResultMessage; }
-                set { strInterfaceResultMessage = value; }
-            }
-
-            public TransErrRtn()
-            {
-                intErrNum = 0;
-                strErrMessage = "";
-                //arrReturnValue = null;
-                //arrReturnValue.Clear();
-                strSystemMessage = "";
-                strSystemStackTrace = "";
-                strSystemInnerException = "";
-                strInterfaceResultCode = "";
-                strInterfaceResultMessage = "";
-            }
-
-            /// <summary>
-            /// 리턴값 배열 초기화
-            /// </summary>
-            public void mfInitReturnValue()
-            {
-                arrReturnValue.Clear();
-            }
-
-            /// <summary>
-            /// 리턴값 배열에 값을 추가
-            /// </summary>
-            /// <param name="strValue"></param>
-            public void mfAddReturnValue(string strValue)
-            {
-                arrReturnValue.Add(strValue);
-            }
-
-            /// <summary>
-            /// 리턴갑 배열에 값을 삭제
-            /// </summary>
-            /// <param name="intIndex"></param>
-            public void mfDeleteReturnValue(int intIndex)
-            {
-                arrReturnValue.Remove(intIndex);
-            }
-
-            /// <summary>
-            /// 리턴값 배열 얻기
-            /// </summary>
-            /// <returns></returns>
-            public ArrayList mfGetReturnValue()
-            {
-                return arrReturnValue;
-            }
-
-            /// <summary>
-            /// 리턴갑 배열중 특정값 얻기
-            /// </summary>
-            /// <param name="intIndex"></param>
-            /// <returns></returns>
-            public string mfGetReturnValue(int intIndex)
-            {
-                if (arrReturnValue.Count >= intIndex + 1)
-                {
-                    return arrReturnValue[intIndex].ToString();
-                }
-                else
-                {
-                    return string.Empty;
-                }
-            }
-
-            /// <summary>
-            /// 에러메세지 구조체 정보를 문자열로 변환
-            /// </summary>
-            /// <param name="Err">트랜잭션처리정보 구조체</param>
-            /// <returns>Encoding값</returns>
-            public string mfEncodingErrMessage(TransErrRtn Err)
-            {
-                string strErr = "";
-                string strErrSep = "<Err>";
-                string strOutSep = "<OUT>";
-                try
-                {
-                    strErr = Err.intErrNum.ToString() + strErrSep +
-                             Err.strErrMessage + strErrSep +
-                             Err.strSystemMessage + strErrSep +
-                             Err.strSystemStackTrace + strErrSep +
-                             Err.strSystemInnerException + strErrSep +
-                             Err.strInterfaceResultCode + strErrSep +       //추가
-                             Err.strInterfaceResultMessage + strErrSep;     //추가
-
-                    if (Err.arrReturnValue.Count > 0)
-                    {
-                        //strErr = strErr + "OUTPUT";
-                        for (int i = 0; i < Err.arrReturnValue.Count; i++)
-                        {
-                            strErr = strErr + Err.arrReturnValue[i].ToString() + strOutSep;
-                        }
-                    }
-                    return strErr;
-
-                }
-                catch //(Exception ex)
-                {
-                    return strErr;
-                }
-                finally
-                {
-                }
-            }
-
-            /// <summary>
-            /// 에러메시지 문자를 구조체로 변환
-            /// </summary>
-            /// <param name="strErr">트랜잭션처리정보 문자열</param>
-            /// <returns>Decoding값</returns>
-            public TransErrRtn mfDecodingErrMessage(string strErr)
-            {
-                TransErrRtn errMsg = new TransErrRtn();
-                try
-                {
-                    string[] arrErrSep = { "<Err>" };
-                    string[] arrOutSep = { "<OUT>" };
-
-                    string[] arrErrMsg = strErr.Split(arrErrSep, StringSplitOptions.None);
-
-                    errMsg.intErrNum = Convert.ToInt32(arrErrMsg[0]);
-                    if (arrErrMsg.Length > 1)
-                        errMsg.strErrMessage = arrErrMsg[1];
-
-                    if (arrErrMsg.Length > 2)
-                        errMsg.strSystemMessage = arrErrMsg[2];
-
-                    if (arrErrMsg.Length > 3)
-                        errMsg.strSystemStackTrace = arrErrMsg[3];
-
-                    if (arrErrMsg.Length > 4)
-                        errMsg.strSystemInnerException = arrErrMsg[4];
-
-                    if (arrErrMsg.Length > 5)
-                        errMsg.strInterfaceResultCode = arrErrMsg[5];       //추가
-
-                    if (arrErrMsg.Length > 6)
-                        errMsg.strInterfaceResultMessage = arrErrMsg[6];    //추가
-
-
-                    if (strErr.Split(arrOutSep, StringSplitOptions.None).Length > 0)
-                    {
-                        string strtemp = strErr.Substring(strErr.LastIndexOf("<Err>") + arrErrSep[0].Length, strErr.Length - strErr.LastIndexOf("<Err>") - arrErrSep[0].Length);
-                        string[] arrOutput = strtemp.Split(arrOutSep, StringSplitOptions.None);
-
-                        for (int i = 0; i < arrOutput.Length - 1; i++)
-                            errMsg.mfAddReturnValue(arrOutput[i]);
-                    }
-                    return errMsg;
-                }
-                catch //(Exception ex)
-                {
-                    return errMsg;
-                }
-                finally
-                {
-                }
+                return string.Empty;
             }
         }
-        #endregion
+
+        /// <summary>
+        /// convert class to err msg
+        /// </summary>
+        /// <param name="_Err"></param>
+        /// <returns>Encoding value</returns>
+        public string EncodingErrTransaction()
+        {
+            string sErr = "";
+
+            try
+            {
+                sErr = nErrNum.ToString() + arrErrSep[0] +
+                       sErrMsg + arrErrSep[0] +
+                       sException + arrErrSep[0];
+
+                foreach (var item in arrOutput)
+                {
+                    sErr += item + arrOutSep[0];
+                }
+                return sErr;
+            }
+            catch
+            {
+                return sErr;
+            }
+            finally
+            {
+            }
+        }
+
+        /// <summary>
+        /// convert err msg to class
+        /// </summary>
+        /// <param name="_sErr"></param>
+        /// <returns>Decoding class</returns>
+        public CTransactionErr DecodingErrTransaction(string _sErr)
+        {
+            CTransactionErr ErrTrans = new CTransactionErr();
+
+            try
+            {
+                string[] arrErrMsg = _sErr.Split(arrErrSep, StringSplitOptions.None);
+
+                ErrTrans.nErrNum = int.Parse(arrErrMsg[(int)TRANS_MEMBER.ERR_NUM]);
+                ErrTrans.sErrMsg = arrErrMsg[(int)TRANS_MEMBER.ERR_MSG];
+                ErrTrans.sException = arrErrMsg[(int)TRANS_MEMBER.EXCEPTION];
+
+                string[] arrTmp = arrErrMsg[(int)TRANS_MEMBER.OUTPUT].Split(arrOutSep, StringSplitOptions.None);
+                for (int i = 0; i < arrTmp.Length - 1; i++)
+                    ErrTrans.AddOutput(arrTmp[i]);
+
+                return ErrTrans;
+            }
+            catch
+            {
+                return ErrTrans;
+            }
+            finally
+            {
+            }
+        }
     }
+    #endregion
+
+    enum TRANS_MEMBER
+    {
+        ERR_NUM = 0,
+        ERR_MSG,
+        EXCEPTION,
+        OUTPUT,
+    }
+
+    enum PARAM_TYPE
+    {
+        NAME = 0,
+        DIRECTION,
+        TYPE,
+        VALUE,
+        LENGTH,
+    }
+
 }
