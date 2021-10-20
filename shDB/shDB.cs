@@ -23,8 +23,7 @@ namespace shDB
 
             private void MessageOut(string _sMsg)
             {
-                if (MessageEvent != null)
-                    MessageEvent(_sMsg);
+                MessageEvent?.Invoke(_sMsg);
             }
 
             #region con
@@ -194,10 +193,13 @@ namespace shDB
                 {
                     if (Conn.State == ConnectionState.Open)
                     {
-                        SqlCommand m_SqlCmd = new SqlCommand();
-                        m_SqlCmd.Connection = Conn;
-                        m_SqlCmd.CommandType = CommandType.StoredProcedure;
-                        m_SqlCmd.CommandText = strSPName;
+                        SqlCommand m_SqlCmd = new SqlCommand()
+                        {
+                            Connection = Conn,
+                            CommandType = CommandType.StoredProcedure,
+                            CommandText = strSPName,
+                        };
+
                         foreach (DataRow dr in dtSPParameter.Rows)
                         {
                             SqlParameter param = new SqlParameter()
@@ -486,8 +488,7 @@ namespace shDB
 
             private void MessageOut(string _sMsg)
             {
-                if (MessageEvent != null)
-                    MessageEvent(_sMsg);
+                MessageEvent?.Invoke(_sMsg);
             }
 
             #region con
@@ -868,8 +869,8 @@ namespace shDB
         string sException;
         List<string> arrOutput;
 
-        string sErrSep = "<Err>";
-        string sOutSep = "<Out>";
+        const string sErrSep = "<Err>";
+        const string sOutSep = "<Out>";
 
         public int ErrNum
         {
