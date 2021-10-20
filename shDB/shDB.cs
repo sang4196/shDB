@@ -868,8 +868,8 @@ namespace shDB
         string sException;
         List<string> arrOutput;
 
-        string[] arrErrSep = { "<Err>" };
-        string[] arrOutSep = { "<Out>" };
+        string sErrSep = "<Err>";
+        string sOutSep = "<Out>";
 
         public int ErrNum
         {
@@ -944,7 +944,6 @@ namespace shDB
         /// <summary>
         /// convert class to err msg
         /// </summary>
-        /// <param name="_Err"></param>
         /// <returns>Encoding value</returns>
         public string EncodingErrTransaction()
         {
@@ -952,13 +951,13 @@ namespace shDB
 
             try
             {
-                sErr = nErrNum.ToString() + arrErrSep[0] +
-                       sErrMsg + arrErrSep[0] +
-                       sException + arrErrSep[0];
+                sErr = nErrNum.ToString() + sErrSep +
+                       sErrMsg + sErrSep +
+                       sException + sErrSep;
 
                 foreach (var item in arrOutput)
                 {
-                    sErr += item + arrOutSep[0];
+                    sErr += item + sOutSep;
                 }
                 return sErr;
             }
@@ -976,9 +975,12 @@ namespace shDB
         /// </summary>
         /// <param name="_sErr"></param>
         /// <returns>Decoding class</returns>
-        public CTransactionErr DecodingErrTransaction(string _sErr)
+        public static CTransactionErr DecodingErrTransaction(string _sErr)
         {
             CTransactionErr ErrTrans = new CTransactionErr();
+
+            string[] arrErrSep = { "<Err>" };
+            string[] arrOutSep = { "<Out>" };
 
             try
             {
