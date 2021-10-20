@@ -18,6 +18,15 @@ namespace shDB
             static SqlTransaction m_Trans;
             static SqlConnection m_SqlCon;
 
+            public delegate void MessageEventHandler(string _sMsg);
+            public event MessageEventHandler MessageEvent;
+
+            private void MessageOut(string _sMsg)
+            {
+                if (MessageEvent != null)
+                    MessageEvent(_sMsg);
+            }
+
             #region con
             public string ConnString
             {
@@ -37,7 +46,7 @@ namespace shDB
             //    }
             //    catch (Exception ex)
             //    {
-            //        throw new ApplicationException(System.Reflection.MethodBase.GetCurrentMethod().Name, ex);
+            //        MessageOut($"[{System.Reflection.MethodBase.GetCurrentMethod().Name}] {ex}");
             //    }
             //}
 
@@ -49,7 +58,7 @@ namespace shDB
                 }
                 catch (Exception ex)
                 {
-                    throw new ApplicationException(System.Reflection.MethodBase.GetCurrentMethod().Name, ex);
+                    MessageOut($"[{System.Reflection.MethodBase.GetCurrentMethod().Name}] {ex}");
                 }
             }
             ~CSQL()
@@ -78,7 +87,7 @@ namespace shDB
                 }
                 catch (Exception ex)
                 {
-                    throw new ApplicationException(System.Reflection.MethodBase.GetCurrentMethod().Name, ex);
+                    MessageOut($"[{System.Reflection.MethodBase.GetCurrentMethod().Name}] {ex}");
                 }
             }
 
@@ -117,8 +126,8 @@ namespace shDB
                 }
                 catch (Exception ex)
                 {
+                    MessageOut($"[{System.Reflection.MethodBase.GetCurrentMethod().Name}] {ex}");
                     return false;
-                    throw new ApplicationException(System.Reflection.MethodBase.GetCurrentMethod().Name, ex);
                 }
             }
 
@@ -136,7 +145,7 @@ namespace shDB
                 }
                 catch (Exception ex)
                 {
-                    throw new ApplicationException(System.Reflection.MethodBase.GetCurrentMethod().Name, ex);
+                    MessageOut($"[{System.Reflection.MethodBase.GetCurrentMethod().Name}] {ex}");
                 }
             }
             #endregion
@@ -170,7 +179,8 @@ namespace shDB
                 }
                 catch (Exception ex)
                 {
-                    throw new ApplicationException(System.Reflection.MethodBase.GetCurrentMethod().Name, ex);
+                    MessageOut($"[{System.Reflection.MethodBase.GetCurrentMethod().Name}] {ex}");
+                    return null;
                 }
                 //finally
                 //{
@@ -214,7 +224,8 @@ namespace shDB
                 }
                 catch (Exception ex)
                 {
-                    throw new ApplicationException(System.Reflection.MethodBase.GetCurrentMethod().Name, ex);
+                    MessageOut($"[{System.Reflection.MethodBase.GetCurrentMethod().Name}] {ex}");
+                    return null;
                 }
                 //finally
                 //{
@@ -364,7 +375,8 @@ namespace shDB
                 }
                 catch (Exception ex)
                 {
-                    throw new ApplicationException(System.Reflection.MethodBase.GetCurrentMethod().Name, ex);
+                    MessageOut($"[{System.Reflection.MethodBase.GetCurrentMethod().Name}] {ex}");
+                    return null;
                 }
             }
 
@@ -389,7 +401,7 @@ namespace shDB
                 }
                 catch (Exception ex)
                 {
-                    throw new ApplicationException(System.Reflection.MethodBase.GetCurrentMethod().Name, ex);
+                    MessageOut($"[{System.Reflection.MethodBase.GetCurrentMethod().Name}] {ex}");
                 }
                 //finally
                 //{
@@ -417,7 +429,7 @@ namespace shDB
                 }
                 catch (Exception ex)
                 {
-                    throw new ApplicationException(System.Reflection.MethodBase.GetCurrentMethod().Name, ex);
+                    MessageOut($"[{System.Reflection.MethodBase.GetCurrentMethod().Name}] {ex}");
                 }
                 //finally
                 //{
@@ -447,7 +459,7 @@ namespace shDB
                 }
                 catch (Exception ex)
                 {
-                    throw new ApplicationException(System.Reflection.MethodBase.GetCurrentMethod().Name, ex);
+                    MessageOut($"[{System.Reflection.MethodBase.GetCurrentMethod().Name}] {ex}");
                 }
                 //finally
                 //{
@@ -469,6 +481,15 @@ namespace shDB
             private static OleDbConnection m_SqlCon;
             private static OleDbTransaction m_Trans;
 
+            public delegate void MessageEventHandler(string _sMsg);
+            public event MessageEventHandler MessageEvent;
+
+            private void MessageOut(string _sMsg)
+            {
+                if (MessageEvent != null)
+                    MessageEvent(_sMsg);
+            }
+
             #region con
             public string ConnString
             {
@@ -488,7 +509,7 @@ namespace shDB
             //    }
             //    catch (Exception ex)
             //    {
-            //        throw new ApplicationException(System.Reflection.MethodBase.GetCurrentMethod().Name, ex);
+            //        MessageOut($"[{System.Reflection.MethodBase.GetCurrentMethod().Name}] {ex}");
             //    }
             //    //finally
             //    //{
@@ -503,7 +524,7 @@ namespace shDB
                 }
                 catch (Exception ex)
                 {
-                    throw new ApplicationException(System.Reflection.MethodBase.GetCurrentMethod().Name, ex);
+                    MessageOut($"[{System.Reflection.MethodBase.GetCurrentMethod().Name}] {ex}");
                 }
             }
             ~CSQL()
@@ -532,7 +553,7 @@ namespace shDB
                 }
                 catch (Exception ex)
                 {
-                    throw new ApplicationException(System.Reflection.MethodBase.GetCurrentMethod().Name, ex);
+                    MessageOut($"[{System.Reflection.MethodBase.GetCurrentMethod().Name}] {ex}");
                 }
             }
 
@@ -571,7 +592,8 @@ namespace shDB
                 }
                 catch (Exception ex)
                 {
-                    throw new ApplicationException(System.Reflection.MethodBase.GetCurrentMethod().Name, ex);
+                    MessageOut($"[{System.Reflection.MethodBase.GetCurrentMethod().Name}] {ex}");
+                    return false;
                 }
                 //finally
                 //{
@@ -591,7 +613,7 @@ namespace shDB
                 }
                 catch (Exception ex)
                 {
-                    throw new ApplicationException(System.Reflection.MethodBase.GetCurrentMethod().Name, ex);
+                    MessageOut($"[{System.Reflection.MethodBase.GetCurrentMethod().Name}] {ex}");
                 }
                 //finally
                 //{
@@ -628,7 +650,8 @@ namespace shDB
                 }
                 catch (Exception ex)
                 {
-                    throw new ApplicationException(System.Reflection.MethodBase.GetCurrentMethod().Name, ex);
+                    MessageOut($"[{System.Reflection.MethodBase.GetCurrentMethod().Name}] {ex}");
+                    return null;
                 }
                 //finally
                 //{
@@ -711,7 +734,8 @@ namespace shDB
                 }
                 catch (Exception ex)
                 {
-                    throw new ApplicationException(System.Reflection.MethodBase.GetCurrentMethod().Name, ex);
+                    MessageOut($"[{System.Reflection.MethodBase.GetCurrentMethod().Name}] {ex}");
+                    return null;
                 }
                 //finally
                 //{
@@ -751,7 +775,8 @@ namespace shDB
                 }
                 catch (Exception ex)
                 {
-                    throw new ApplicationException(System.Reflection.MethodBase.GetCurrentMethod().Name, ex);
+                    MessageOut($"[{System.Reflection.MethodBase.GetCurrentMethod().Name}] {ex}");
+                    return null;
                 }
             }
 
@@ -776,7 +801,7 @@ namespace shDB
                 }
                 catch (Exception ex)
                 {
-                    throw new ApplicationException(System.Reflection.MethodBase.GetCurrentMethod().Name, ex);
+                    MessageOut($"[{System.Reflection.MethodBase.GetCurrentMethod().Name}] {ex}");
                 }
                 //finally
                 //{
@@ -804,7 +829,7 @@ namespace shDB
                 }
                 catch (Exception ex)
                 {
-                    throw new ApplicationException(System.Reflection.MethodBase.GetCurrentMethod().Name, ex);
+                    MessageOut($"[{System.Reflection.MethodBase.GetCurrentMethod().Name}] {ex}");
                 }
                 //finally
                 //{
@@ -824,7 +849,7 @@ namespace shDB
                 }
                 catch (Exception ex)
                 {
-                    throw new ApplicationException(System.Reflection.MethodBase.GetCurrentMethod().Name, ex);
+                    MessageOut($"[{System.Reflection.MethodBase.GetCurrentMethod().Name}] {ex}");
                 }
                 //finally
                 //{
