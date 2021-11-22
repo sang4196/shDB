@@ -51,6 +51,9 @@
     <Reference Include="System.Xml" />
   </ItemGroup>
   <ItemGroup>
+    <Compile Include="MSAccess\Access.cs" />
+    <Compile Include="MSSQL\MSSQL.cs" />
+    <Compile Include="Oracle\Oracle.cs" />
     <Compile Include="shDB.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
   </ItemGroup>
